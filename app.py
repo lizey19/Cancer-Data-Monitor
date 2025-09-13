@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.figure_factory as ff
 
 st.title("🩺 Cancer Patient Data Monitor (Large Dataset Friendly)")
 
@@ -41,11 +42,33 @@ if uploaded_file:
     if pd.api.types.is_numeric_dtype(df[column]):
         fig = px.histogram(df_sample, x=column, nbins=40, marginal="box", title=f"Distribution of {column}")
         st.plotly_chart(fig, use_container_width=True)
+
+        # Violin plot
+        fig_violin = px.violin(df_sample, y=column, box=True, points="all", title=f"Violin Plot of {column}")
+        st.plotly_chart(fig_violin, use_container_width=True)
+
+        # KDE Density Plot
+        fig_kde = ff.create_distplot([df_sample[column].dropna()], [column], show_hist=False)
+        st.plotly_chart(fig_kde, use_container_width=True)
+
+        # Trend line scatter vs index
+        fig_trend = px.scatter(df_sample.reset_index(), x="index", y=column, trendline="lowess", title=f"Trend of {column} over Index")
+        st.plotly_chart(fig_trend, use_container_width=True)
+
     else:
         top_n = st.slider("Show top N categories", min_value=5, max_value=30, value=10)
         value_counts = df[column].value_counts().nlargest(top_n).reset_index()
         fig = px.bar(value_counts, x="index", y=column, title=f"Top {top_n} Categories in {column}")
         st.plotly_chart(fig, use_container_width=True)
+
+        # Pie chart
+        fig_pie = px.pie(value_counts, names="index", values=column, title=f"Distribution of {column}")
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+        # Sunburst chart (if hierarchy exists)
+        if df[column].nunique() <= 20:
+            fig_sun = px.sunburst(df_sample, path=[column], title=f"Sunburst of {column}")
+            st.plotly_chart(fig_sun, use_container_width=True)
 
     # Outlier detection (sampled)
     st.subheader("🚨 Outlier Detection (IQR Method, Sampled Data)")
@@ -62,3 +85,34 @@ if uploaded_file:
         if len(cols) == 3:
             fig3d = px.scatter_3d(df_sample, x=cols[0], y=cols[1], z=cols[2], color=cols[0], opacity=0.6)
             st.plotly_chart(fig3d, use_container_width=True)
+
+    # Pairwise scatter matrix
+    if not numeric_df.empty and len(numeric_df.columns) > 1:
+        st.subheader("🔗 Pairwise Scatter Matrix")
+        fig_matrix = px.scatter_matrix(df_sample, dimensions=numeric_df.columns[:5], title="Scatter Matrix of Numeric Features")
+        st.plotly_chart(fig_matrix, use_container_width=True)
+
+    # Boxplots for multiple features
+    if not numeric_df.empty:
+        st.subheader("📦 Multiple Feature Boxplots")
+        selected_cols = st.multiselect("Select numeric columns for boxplots", numeric_df.columns, numeric_df.columns[:3])
+        if selected_cols:
+            fig_box = px.box(df_sample[selected_cols], points="all")
+            st.plotly_chart(fig_box, use_container_width=True)
+
+    # Parallel coordinates for multidimensional view
+    if not numeric_df.empty and len(numeric_df.columns) > 2:
+        st.subheader("🪢 Parallel Coordinates Plot")
+        cols = st.multiselect("Select numeric columns for parallel coordinates", numeric_df.columns, numeric_df.columns[:5])
+        if len(cols) > 1:
+            fig_para = px.parallel_coordinates(df_sample[cols], color=cols[0], title="Parallel Coordinates")
+            st.plotly_chart(fig_para, use_container_width=True)
+
+    # Bubble chart
+    if len(numeric_df.columns) >= 2:
+        st.subheader("🎈 Bubble Chart")
+        x_axis = st.selectbox("Select X-axis", numeric_df.columns, index=0)
+        y_axis = st.selectbox("Select Y-axis", numeric_df.columns, index=1)
+        size_col = st.selectbox("Select size column", numeric_df.columns, index=2 if len(numeric_df.columns) > 2 else 0)
+        fig_bubble = px.scatter(df_sample, x=x_axis, y=y_axis, size=size_col, color=x_axis, hover_name=y_axis, title="Bubble Chart")
+        st.plotly_chart(fig_bubble, use_container_width=True)
